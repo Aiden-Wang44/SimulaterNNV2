@@ -2,7 +2,8 @@ from Math.Geometry.GeometryPrimitives import Vector2D, Pose, Angle
 import numpy as np
 import math
 from SimulatedAlgorithms.ramsete import FeedForward
-NM_TO_KG_IN2_S2 = 1550.003
+
+NM_TO_KG_IN2_S2 = 1550.3
 class Robot:
     def __init__(
         self,
@@ -28,8 +29,9 @@ class Robot:
 
 
 class DriveTrain:
-    def __init__(self,gear_train: GearTrain, drive_wheel: DriveWheel, left_motors: list[Motor], right_motors: list[Motor], track_width: float, feed_forward : FeedForward):
-        self.gear_train = gear_train
+    def __init__(self,left_gear_train: GearTrain,right_gear_train, drive_wheel: DriveWheel, left_motors: list[Motor], right_motors: list[Motor], track_width: float, feed_forward : FeedForward):
+        self.left_gear_train = left_gear_train
+        self.right_gear_train = right_gear_train
         self.drive_wheel = drive_wheel
         self.left_motors = left_motors
         self.right_motors = right_motors
@@ -42,21 +44,23 @@ class DriveTrain:
         self.set_right_voltage(self.feed_forward.get_target_voltage(right_velocity))
     def set_left_voltage(self, voltage: float):
         for motor in self.left_motors:
+            motor.set_velocity(self.left_gear_train.get_velocity())
             motor.set_voltage(voltage)
     def set_right_voltage(self, voltage: float):
         for motor in self.right_motors:
+            motor.set_velocity(self.right_gear_train.get_velocity())
             motor.set_voltage(voltage)
 
     def get_left_torque(self):
         left_torque = 0
         for motor in self.left_motors:
             left_torque+= motor.get_torque()
-        return self.gear_train.get_torque(left_torque)
+        return self.left_gear_train.get_torque(left_torque, 0.01)
     def get_right_torque(self):
         right_torque = 0
         for motor in self.right_motors:
             right_torque+= motor.get_torque()
-        return self.gear_train.get_torque(right_torque)
+        return self.right_gear_train.get_torque(right_torque,0.01)
     def get_left_force(self):
         left_torque = self.get_left_torque()
         return self.drive_wheel.get_force(left_torque)
@@ -78,16 +82,38 @@ class Motor:
     def get_torque(self):
         if self.voltage == 0:
             return 0.0
+        speed = abs(self.velocity)
 
-        return 0.35 * NM_TO_KG_IN2_S2 * (self.voltage / 12.0)
+        if speed < 390:
+            speed_factor = 1.0
+        else:
+            speed_factor = 1.0 - (speed - 390.0) / (600.0 - 390.0)
+
+        speed_factor = max(0.0, speed_factor)
+        return (
+                0.35
+                * NM_TO_KG_IN2_S2
+                * (self.voltage / 12.0)
+                * speed_factor
+        )
+    def set_velocity(self, velocity: float):
+        self.velocity = velocity
 #torque to torque
 #gear ratio is speed/in over speed/out
 class GearTrain:
-    def __init__(self,gear_ratio: float, efficiency: float):
+    def __init__(self,gear_ratio: float, efficiency: float, inertia: float):
         self.gear_ratio = gear_ratio
         self.efficiency = efficiency
-    def get_torque(self, input_torque: float):
+        #rpm velocity
+        self.motor_velocity = 0.0
+        self.inertia = inertia
+    def get_torque(self, input_torque: float, dt: float):
+        accel = input_torque * self.efficiency / self.inertia
+        self.motor_velocity += (accel * dt)
         return input_torque * self.efficiency / self.gear_ratio
+    #returns rpm
+    def get_velocity(self):
+        return self.motor_velocity * 60.0 / (2 * math.pi)
 #torque to force
 class DriveWheel:
     def __init__(self, max_ground_force:float, radius:float):

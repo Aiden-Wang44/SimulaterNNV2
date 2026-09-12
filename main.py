@@ -1,14 +1,16 @@
 import math
 import time
-
-from DataModels.robot import *
-from Visualizer.visualizer import *
 from Math.Geometry.GeometryPrimitives import *
 from inputs.pathStorage import *
 from SimulatedAlgorithms.localizer import *
 from SimulatedAlgorithms.ramsete import *
+from DataModels.robot import *
+from DataModels.robot import GearTrain
+from Visualizer.visualizer import *
+
 time_step = 0.01
-gear_train = GearTrain(0.75, 1)
+gear_train_l = GearTrain(0.75, 0.95, 0.374)
+gear_train_r = GearTrain(0.75, 0.95, 0.374)
 drive_wheel = DriveWheel(1000000,1.375)
 left_motors = []
 right_motors = []
@@ -16,11 +18,11 @@ for i in range (3):
     left_motors.append(Motor())
 for i in range (3):
     right_motors.append(Motor())
-horizontal_tracker = TrackerWheel(1.375,100000,0.1)
-vertical_tracker = TrackerWheel(1,1000000,0.1)
+horizontal_tracker = TrackerWheel(1.375,100000,0.07)
+vertical_tracker = TrackerWheel(1,1000000,0.18)
 inertial = IMU()
-feed_forward = FeedForward(0.52, 1.155, 0.020)
-drive_train = DriveTrain(gear_train,drive_wheel,left_motors,right_motors,11.5, feed_forward)
+feed_forward = FeedForward(0.001, 0.00, 0.020)
+drive_train = DriveTrain(gear_train_l,gear_train_r,drive_wheel,left_motors,right_motors,11.5, feed_forward)
 robot = Robot(11.5,12.0,Pose(Vector2D(0.0,0.0),Angle(0.0)),6.5,drive_train,horizontal_tracker,vertical_tracker,inertial)
 odom = TwoAxisTwoWheelOdom(horizontal_tracker,vertical_tracker,inertial)
 localizer = SimpleLocalizer(odom)
