@@ -21,7 +21,7 @@ class Robot:
         self.pose = pose
         self.mass = mass
         self.weight = mass * 386.09
-        self.inertia =  0.64*mass * (width ** 2 + length ** 2) / 12
+        self.inertia =  0.32*mass * (width ** 2 + length ** 2) / 12
         self.drive_train = drive_train
         self.horizontal_tracker = horizontal_tracker
         self.vertical_tracker = vertical_tracker
@@ -91,7 +91,7 @@ class Motor:
         if speed < 390:
             speed_factor = 1.0
         else:
-            speed_factor = 1.0 - (speed - 390.0) / (700.0 - 390.0)
+            speed_factor = 1.0 - (speed - 390.0) / (600.0 - 390.0)
 
         speed_factor = max(0.0, speed_factor)
         return (
@@ -165,20 +165,20 @@ class IMU:
 
 
 class ChassisDynamics:
-    def __init__(self, robot: Robot, timestep: float, lateral_friction: FrictionForce, rotational_friction: FrictionForce):
+    def __init__(self, robot: Robot, timestep: float, lateral_friction: FrictionForce, rotational_friction: FrictionForce, forward_friction: FrictionForce):
         self.robot = robot
         self.local_vel = Vector2D(0, 0)  # x = right, y = forward
         self.angular_vel = 0.0
         self.dt = timestep
         self.lateral_friction = lateral_friction
         self.rotational_friction = rotational_friction
-
+        self.forward_friction = forward_friction
     def update(self):
         left_force = self.robot.drive_train.get_left_force()
         right_force = self.robot.drive_train.get_right_force()
 
         forward_force = left_force + right_force
-
+        forward_friction_force = self.forward_friction.get_force(self.local_vel.y, forward_force, 2300) - self.local_vel.y*140
         required_lateral_force = self.robot.mass * self.angular_vel * self.local_vel.y
 
         lateral_force = self.lateral_friction.get_force(
@@ -187,12 +187,14 @@ class ChassisDynamics:
             self.robot.weight
         )
 
+
         # 2. Body-frame accelerations
         # a_x (Lateral / Right)
 
         lateral_accel = (lateral_force / self.robot.mass) + (self.angular_vel * self.local_vel.y)
         # a_y (Forward)
-        forward_accel = (forward_force / self.robot.mass) - (self.angular_vel * self.local_vel.x) - np.sign(self.local_vel.y)* 5
+
+        forward_accel = (forward_force + forward_friction_force / self.robot.mass) - (self.angular_vel * self.local_vel.x)
         r = self.robot.drive_train.track_width / 2.0
         driving_torque = (right_force - left_force) * r
         required_rot_force = (right_force - left_force)
