@@ -2,7 +2,7 @@ from Math.Geometry.GeometryPrimitives import Vector2D, Pose, Angle
 import numpy as np
 import math
 from SimulatedAlgorithms.ramsete import FeedForward
-
+from DataModels.frictionForces import FrictionForce
 NM_TO_KG_IN2_S2 = 1550.3
 class Robot:
     def __init__(
@@ -21,7 +21,7 @@ class Robot:
         self.pose = pose
         self.mass = mass
         self.weight = mass * 386.09
-        self.inertia = mass * (width ** 2 + length ** 2) / 12
+        self.inertia =  0.64*mass * (width ** 2 + length ** 2) / 12
         self.drive_train = drive_train
         self.horizontal_tracker = horizontal_tracker
         self.vertical_tracker = vertical_tracker
@@ -44,23 +44,27 @@ class DriveTrain:
         self.set_right_voltage(self.feed_forward.get_target_voltage(right_velocity))
     def set_left_voltage(self, voltage: float):
         for motor in self.left_motors:
-            motor.set_velocity(self.left_gear_train.get_velocity())
+
             motor.set_voltage(voltage)
     def set_right_voltage(self, voltage: float):
         for motor in self.right_motors:
-            motor.set_velocity(self.right_gear_train.get_velocity())
+
             motor.set_voltage(voltage)
 
     def get_left_torque(self):
         left_torque = 0
         for motor in self.left_motors:
+            motor.set_velocity(self.left_gear_train.get_velocity())
             left_torque+= motor.get_torque()
-        return self.left_gear_train.get_torque(left_torque, 0.01)
+
+        return self.left_gear_train.get_torque(left_torque)
     def get_right_torque(self):
         right_torque = 0
         for motor in self.right_motors:
+            motor.set_velocity(self.right_gear_train.get_velocity())
             right_torque+= motor.get_torque()
-        return self.right_gear_train.get_torque(right_torque,0.01)
+
+        return self.right_gear_train.get_torque(right_torque)
     def get_left_force(self):
         left_torque = self.get_left_torque()
         return self.drive_wheel.get_force(left_torque)
@@ -87,11 +91,11 @@ class Motor:
         if speed < 390:
             speed_factor = 1.0
         else:
-            speed_factor = 1.0 - (speed - 390.0) / (600.0 - 390.0)
+            speed_factor = 1.0 - (speed - 390.0) / (700.0 - 390.0)
 
         speed_factor = max(0.0, speed_factor)
         return (
-                0.35
+                0.33
                 * NM_TO_KG_IN2_S2
                 * (self.voltage / 12.0)
                 * speed_factor
@@ -99,20 +103,28 @@ class Motor:
     def set_velocity(self, velocity: float):
         self.velocity = velocity
 #torque to torque
-#gear ratio is speed/in over speed/out
+#gear ratio is torque/in over torque/out
 class GearTrain:
-    def __init__(self,gear_ratio: float, efficiency: float, inertia: float):
+    def __init__(self, gear_ratio: float, efficiency: float, inertia: float):
         self.gear_ratio = gear_ratio
         self.efficiency = efficiency
-        #rpm velocity
+        # velocity in rad/s internally
         self.motor_velocity = 0.0
         self.inertia = inertia
-    def get_torque(self, input_torque: float, dt: float):
-        accel = input_torque * self.efficiency / self.inertia
-        self.motor_velocity += (accel * dt)
+
+    def get_torque(self, input_torque: float) -> float:
+        """Pure query function: calculates output torque without mutating state."""
         return input_torque * self.efficiency / self.gear_ratio
-    #returns rpm
-    def get_velocity(self):
+
+    def update(self, input_torque: float, dt: float):
+        """Explicit state update step: call this once per timestep."""
+
+        accel = input_torque * self.efficiency / self.inertia
+        self.motor_velocity += accel * dt
+    def set_velocity(self,velocity):
+        self.motor_velocity = velocity
+    # returns rpm
+    def get_velocity(self) -> float:
         return self.motor_velocity * 60.0 / (2 * math.pi)
 #torque to force
 class DriveWheel:
@@ -124,23 +136,20 @@ class DriveWheel:
         return s * min(abs(input_torque / self.radius), self.max_ground_force)
 #dead trackerwheels
 class TrackerWheel:
-    def __init__(self, radius:float, max_ground_force: float, mass: float):
-        self.max_ground_force = max_ground_force
-        self.mass= mass
+    def __init__(self, radius: float):
         self.radius = radius
         self.rotation = 0.0
         self.velocity = 0.0
-        self.inertia = self.mass * (self.radius**2)/2
     def reset(self):
         self.rotation = 0.0
     def get_position(self):
         return self.rotation * self.radius
-    def update(self, acceleration: float, dt: float):
-        torque = np.sign(acceleration) * min(abs(acceleration *self.mass), self.max_ground_force ) * self.radius
-        ang_accel = torque / self.inertia
-        self.velocity += ang_accel * dt
-        self.rotation += self.velocity * dt
 
+    def update(self, chassis_linear_vel: float, dt: float):
+        target_velocity = chassis_linear_vel
+
+        self.velocity = target_velocity
+        self.rotation += (self.velocity / self.radius) * dt
 class IMU:
     def __init__(self):
         self.heading = Angle(0.0)
@@ -154,28 +163,62 @@ class IMU:
     def get_heading(self):
         return self.heading
 
+
 class ChassisDynamics:
-    def __init__(self,robot: Robot, timestep : float):
+    def __init__(self, robot: Robot, timestep: float, lateral_friction: FrictionForce, rotational_friction: FrictionForce):
         self.robot = robot
-        self.local_vel = Vector2D(0,0)
+        self.local_vel = Vector2D(0, 0)  # x = right, y = forward
         self.angular_vel = 0.0
         self.dt = timestep
+        self.lateral_friction = lateral_friction
+        self.rotational_friction = rotational_friction
 
     def update(self):
         left_force = self.robot.drive_train.get_left_force()
         right_force = self.robot.drive_train.get_right_force()
 
-        forward_accel = (left_force + right_force) / self.robot.mass
+        forward_force = left_force + right_force
 
-        local_accel = Vector2D(-self.angular_vel * self.local_vel.y,forward_accel + self.angular_vel * self.local_vel.x)
-        angular_accel = ((right_force - left_force) * self.robot.drive_train.track_width/2)/self.robot.inertia
+        required_lateral_force = self.robot.mass * self.angular_vel * self.local_vel.y
 
+        lateral_force = self.lateral_friction.get_force(
+            self.local_vel.x,
+            required_lateral_force,
+            self.robot.weight
+        )
+
+        # 2. Body-frame accelerations
+        # a_x (Lateral / Right)
+
+        lateral_accel = (lateral_force / self.robot.mass) + (self.angular_vel * self.local_vel.y)
+        # a_y (Forward)
+        forward_accel = (forward_force / self.robot.mass) - (self.angular_vel * self.local_vel.x) - np.sign(self.local_vel.y)* 5
+        r = self.robot.drive_train.track_width / 2.0
+        driving_torque = (right_force - left_force) * r
+        required_rot_force = (right_force - left_force)
+        rotational_surface_speed = self.angular_vel * r
+
+        friction_force = self.rotational_friction.get_force(rotational_surface_speed,required_rot_force,self.robot.weight)
+        friction_torque = friction_force * r
+
+        # get_force() already returns opposite sign (-), so we simply add it
+        net_torque = driving_torque + friction_torque
+        angular_accel = net_torque / self.robot.inertia
+        local_accel = Vector2D(lateral_accel, forward_accel)
+
+        # 3. Integrate velocities & position
         self.local_vel = self.local_vel + local_accel * self.dt
         self.angular_vel = self.angular_vel + angular_accel * self.dt
+
+        left_shaft_vel = (self.local_vel.y -self.angular_vel * self.robot.drive_train.track_width/2) / (self.robot.drive_train.drive_wheel.radius * self.robot.drive_train.left_gear_train.gear_ratio)
+        right_shaft_vel = (self.local_vel.y +self.angular_vel * self.robot.drive_train.track_width/2) / (self.robot.drive_train.drive_wheel.radius * self.robot.drive_train.right_gear_train.gear_ratio)
+        self.robot.drive_train.left_gear_train.set_velocity(left_shaft_vel)
+        self.robot.drive_train.right_gear_train.set_velocity(right_shaft_vel)
         global_vel = self.local_vel.rotate(self.robot.pose.heading.radians)
         self.robot.pose.point = self.robot.pose.point + global_vel * self.dt
         self.robot.pose.heading = (self.robot.pose.heading + Angle(self.angular_vel) * self.dt).normalize()
-        self.robot.horizontal_tracker.update(local_accel.x, self.dt)
-        self.robot.vertical_tracker.update(local_accel.y, self.dt)
-        self.robot.inertial.update(angular_accel,self.dt)
 
+        # Trackers (x = horizontal/lateral, y = vertical/forward)
+        self.robot.horizontal_tracker.update(self.local_vel.x, self.dt)
+        self.robot.vertical_tracker.update(self.local_vel.y, self.dt)
+        self.robot.inertial.update(angular_accel, self.dt)

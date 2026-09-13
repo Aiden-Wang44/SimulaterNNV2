@@ -7,26 +7,28 @@ from SimulatedAlgorithms.ramsete import *
 from DataModels.robot import *
 from DataModels.robot import GearTrain
 from Visualizer.visualizer import *
-
+from DataModels.frictionForces import FrictionForce
 time_step = 0.01
-gear_train_l = GearTrain(0.75, 0.95, 0.374)
-gear_train_r = GearTrain(0.75, 0.95, 0.374)
-drive_wheel = DriveWheel(1000000,1.375)
+gear_train_l = GearTrain(0.75, 1, 0.374)
+gear_train_r = GearTrain(0.75, 1, 0.374)
+drive_wheel = DriveWheel(1000000,1.625)
 left_motors = []
 right_motors = []
 for i in range (3):
     left_motors.append(Motor())
 for i in range (3):
     right_motors.append(Motor())
-horizontal_tracker = TrackerWheel(1.375,100000,0.07)
-vertical_tracker = TrackerWheel(1,1000000,0.18)
+horizontal_tracker = TrackerWheel(1.375)
+vertical_tracker = TrackerWheel(1)
 inertial = IMU()
-feed_forward = FeedForward(0.52, 1.155, 0.020)
+feed_forward = FeedForward(0.52, 1.155, 0.02)
+lateral_friction_force = FrictionForce(0.13,0.1)
+rotational_friction_force = FrictionForce(0.95,0.94)
 drive_train = DriveTrain(gear_train_l,gear_train_r,drive_wheel,left_motors,right_motors,11.5, feed_forward)
-robot = Robot(11.5,12.0,Pose(Vector2D(0.0,0.0),Angle(0.0)),7,drive_train,horizontal_tracker,vertical_tracker,inertial)
+robot = Robot(11.5,12.0,Pose(Vector2D(0.0,0.0),Angle(0.0)),6.75,drive_train,horizontal_tracker,vertical_tracker,inertial)
 odom = TwoAxisTwoWheelOdom(horizontal_tracker,vertical_tracker,inertial)
 localizer = SimpleLocalizer(odom)
-dynamics = ChassisDynamics(robot, time_step)
+dynamics = ChassisDynamics(robot, time_step, lateral_friction_force, rotational_friction_force)
 settings = Settings()
 textParser = Parser("inputs/pathOne.txt")
 path_one = textParser.parse()
@@ -39,7 +41,7 @@ visualizer.draw()
 # Test movement.
 curr_time = 0
 
-while curr_time < path_one_full.get_duration()+5 :
+while curr_time < path_one_full.get_duration() :
     path_follower.update(curr_time)
     dynamics.update()
     visualizer.draw()

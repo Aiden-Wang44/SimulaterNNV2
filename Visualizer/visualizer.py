@@ -10,8 +10,8 @@ from Math.Geometry.GeometryPrimitives import *
 from matplotlib.patches import Polygon
 @dataclass
 class Settings:
-    view_width: float = 100.0
-    view_height: float = 100.0
+    view_width: float = 80.0
+    view_height: float = 80.0
     follow_robot: bool = True
 
 

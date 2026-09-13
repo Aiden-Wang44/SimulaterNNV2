@@ -38,9 +38,10 @@ class Ramsete:
         global_error = target.pose.point - p.point
         local_error = global_error.rotate(-p.heading.radians)
         heading_error = (target.pose.heading - p.heading).normalize()
+        print(heading_error)
         vd = target.linearVelocity
         wd = target.angularVelocity
-        k = 2.0 * self.zeta * math.sqrt((wd**2) +self.beta * (vd**2) )
+        k = 2.0* self.zeta * math.sqrt((wd**2) + self.beta * (vd**2))
         v = vd * math.cos(heading_error.radians) + k * local_error.y
-        w = wd + k * heading_error.radians - self.beta * vd * self.sinc(heading_error.radians) * local_error.x
+        w =wd + k * heading_error.radians - self.beta * vd * self.sinc(heading_error.radians) * local_error.x
         self.robot.drive_train.driveVelocity(v, 0 , w)
