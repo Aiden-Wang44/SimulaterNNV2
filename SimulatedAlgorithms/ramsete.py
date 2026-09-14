@@ -31,14 +31,19 @@ class Ramsete:
         if(x == 0.0):
             return 1.0
         return math.sin(x)/x
-    def update(self, time: float):
+    def update(self, time: float,override_setting: bool, override: Pose):
         self.localizer.update()
         target = self.trajectory.sample_by_time(time)
+
         p = self.localizer.get_pose()
         global_error = target.pose.point - p.point
-        local_error = global_error.rotate(-p.heading.radians)
         heading_error = (target.pose.heading - p.heading).normalize()
-        print(heading_error)
+        if override_setting:
+            global_error = global_error + override.point
+            heading_error = (heading_error + override.heading).normalize()
+
+        local_error = global_error.rotate(-p.heading.radians)
+
         vd = target.linearVelocity
         wd = target.angularVelocity
         k = 2.0* self.zeta * math.sqrt((wd**2) + self.beta * (vd**2))
