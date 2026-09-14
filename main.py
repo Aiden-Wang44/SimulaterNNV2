@@ -5,8 +5,8 @@ import torch
 
 from Env import RobotEnv
 from TD3Components.TD3 import TD3
-from train import train
-
+from train import train, visualize_run
+from Visualizer.visualizer import Settings
 
 def set_seed(seed: int):
     random.seed(seed)
@@ -59,6 +59,10 @@ def main():
         evaluate_every=5,
         evaluation_episodes=2,
     )
+    settings = Settings()
+    visualize_run(
+        env=env,
+        agent=agent,visualizer_settings=settings )
 
 
 

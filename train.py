@@ -120,14 +120,14 @@ def train(
 
     return episode_rewards
 
-def visualize_run(env, agent):
+def visualize_run(env, agent, visualizer_settings):
     actor_state = env.reset()
 
     # Create a fresh visualizer using the reset environment.
     visualizer = Visualizer(
         env.robot,
-        env.path_one_full,
-        env.visualizer.settings,
+        env.path_one,
+        visualizer_settings,
         env.time_step,
     )
 
