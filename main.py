@@ -48,14 +48,11 @@ def main():
         env=env,
         agent=agent,
 
-        # Very small smoke test
         episodes=10,
 
-        # Don't start learning immediately
         warmup_steps=100,
         train_after=100,
 
-        # Only evaluate once
         evaluate_every=5,
         evaluation_episodes=2,
     )
@@ -65,9 +62,6 @@ def main():
         agent=agent,visualizer_settings=settings )
 
 
-
-if __name__ == "__main__":
-    main()
 
 if __name__ == "__main__":
     main()

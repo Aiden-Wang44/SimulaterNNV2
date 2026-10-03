@@ -8,11 +8,9 @@ class FrictionForce:
         max_static = self.f_s * weight
         kinetic = self.f_k * weight
 
-        # Static friction: cancels out external/required lateral force
         if abs(velocity) <= 0.001 and abs(required_force) <= max_static:
-            return -required_force  # Equal and opposite
+            return -required_force
 
-        # Kinetic friction: opposes direction of lateral velocity (or required force if stationary)
         if abs(velocity) > 0.001:
             return -np.sign(velocity) * kinetic
         else:

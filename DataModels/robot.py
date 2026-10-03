@@ -4,6 +4,8 @@ import math
 from SimulatedAlgorithms.ramsete import FeedForward
 from DataModels.frictionForces import FrictionForce
 NM_TO_KG_IN2_S2 = 1550.3
+#units use radians, seconds, inches
+#coordinate conventions are positive y-axis being 0 radians and CCW positive
 class Robot:
     def __init__(
         self,
@@ -71,8 +73,7 @@ class DriveTrain:
     def get_right_force(self):
         right_torque = self.get_right_torque()
         return self.drive_wheel.get_force(right_torque)
-
-#voltage to torque
+#Vex V5 DC motor curve model
 class Motor:
     def __init__(self):
         self.velocity = 0.0
@@ -108,7 +109,7 @@ class GearTrain:
     def __init__(self, gear_ratio: float, efficiency: float, inertia: float):
         self.gear_ratio = gear_ratio
         self.efficiency = efficiency
-        # velocity in rad/s internally
+
         self.motor_velocity = 0.0
         self.inertia = inertia
 
@@ -188,11 +189,11 @@ class ChassisDynamics:
         )
 
 
-        # 2. Body-frame accelerations
-        # a_x (Lateral / Right)
+#Body-frame accelerations
+# a_x (Lateral / Right)
 
         lateral_accel = (lateral_force / self.robot.mass) + (self.angular_vel * self.local_vel.y)
-        # a_y (Forward)
+# a_y (Forward)
 
         forward_accel = (forward_force + forward_friction_force / self.robot.mass) - (self.angular_vel * self.local_vel.x)
         r = self.robot.drive_train.track_width / 2.0
@@ -203,12 +204,10 @@ class ChassisDynamics:
         friction_force = self.rotational_friction.get_force(rotational_surface_speed,required_rot_force,self.robot.weight)
         friction_torque = friction_force * r
 
-        # get_force() already returns opposite sign (-), so we simply add it
         net_torque = driving_torque + friction_torque
         angular_accel = net_torque / self.robot.inertia
         local_accel = Vector2D(lateral_accel, forward_accel)
-
-        # 3. Integrate velocities & position
+# Integrate velocities & position
         self.local_vel = self.local_vel + local_accel * self.dt
         self.angular_vel = self.angular_vel + angular_accel * self.dt
 
@@ -220,7 +219,7 @@ class ChassisDynamics:
         self.robot.pose.point = self.robot.pose.point + global_vel * self.dt
         self.robot.pose.heading = (self.robot.pose.heading + Angle(self.angular_vel) * self.dt).normalize()
 
-        # Trackers (x = horizontal/lateral, y = vertical/forward)
+# Trackers (x = horizontal/lateral, y = vertical/forward)
         self.robot.horizontal_tracker.update(self.local_vel.x, self.dt)
         self.robot.vertical_tracker.update(self.local_vel.y, self.dt)
         self.robot.inertial.update(angular_accel, self.dt)

@@ -79,16 +79,7 @@ def train(
             episode_reward += reward
             episode_steps += 1
             total_steps += 1
-
-            # ---------------------------------------------------------
-            # Train TD3
-            #
-            # TD3 itself handles:
-            # - critic updates
-            # - target policy smoothing
-            # - delayed actor updates
-            # - target network soft updates
-            # ---------------------------------------------------------
+#Train TD3
             if total_steps >= train_after:
                 agent.train()
 
@@ -105,10 +96,7 @@ def train(
             f"Avg25 {average_reward:9.3f} | "
             f"Total Steps {total_steps:7d}"
         )
-
-        # -------------------------------------------------------------
-        # Periodic evaluation
-        # -------------------------------------------------------------
+#Periodic Evaluation
         if (
             (episode + 1) % evaluate_every == 0
         ):
@@ -123,7 +111,7 @@ def train(
 def visualize_run(env, agent, visualizer_settings):
     actor_state = env.reset()
 
-    # Create a fresh visualizer using the reset environment.
+# Create a fresh visualizer using the reset environment.
     visualizer = Visualizer(
         env.robot,
         env.path_one,
