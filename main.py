@@ -65,10 +65,10 @@ def run_test():
 
     env = RobotEnv()
     settings = Settings()
-    visualize_trained_actor(settings, checkpoint_path="checkpoints/actor_final.pt")
+    visualize_trained_actor(settings, checkpoint_path="checkpoints/actor_best.pt")
 def main():
-    run_training()
-    #run_test()
+    #run_training()
+    run_test()
 
 
 if __name__ == "__main__":
