@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-
+import os
 from TD3Components.Actor import Actor
 from TD3Components.Critic import Critic
 from TD3Components.ReplayBuffer import ReplayBuffer
@@ -304,6 +304,49 @@ class TD3:
                 (1.0 - self.tau) * target_param.data
             )
 
+    def save_actor(self, path: str):
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        torch.save(self.actor.state_dict(), path)
 
+    def load_actor(self, path: str):
+        state_dict = torch.load(
+            path,
+            map_location=self.device,
+            weights_only=True
+        )
+        self.actor.load_state_dict(state_dict)
+        self.actor.eval()
+
+    def save(self, path: str):
+        torch.save({
+            "actor": self.actor.state_dict(),
+            "actor_target": self.actor_target.state_dict(),
+            "critic": self.critic.state_dict(),
+            "critic_target": self.critic_target.state_dict(),
+            "actor_optimizer": self.actor_optimizer.state_dict(),
+            "critic_optimizer": self.critic_optimizer.state_dict(),
+            "training_step": self.training_step,
+        }, path)
+
+    def load(self, path: str):
+        checkpoint = torch.load(
+            path,
+            map_location=self.device,
+            weights_only=False
+        )
+
+        self.actor.load_state_dict(checkpoint["actor"])
+        self.actor_target.load_state_dict(checkpoint["actor_target"])
+        self.critic.load_state_dict(checkpoint["critic"])
+        self.critic_target.load_state_dict(checkpoint["critic_target"])
+
+        self.actor_optimizer.load_state_dict(
+            checkpoint["actor_optimizer"]
+        )
+        self.critic_optimizer.load_state_dict(
+            checkpoint["critic_optimizer"]
+        )
+
+        self.training_step = checkpoint["training_step"]
 
 

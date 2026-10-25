@@ -14,7 +14,7 @@ def train(
     evaluation_episodes: int = 5,
 ):
     total_steps = 0
-
+    best_eval_reward = -float("inf")
     episode_rewards = []
 
     for episode in range(episodes):
@@ -84,7 +84,6 @@ def train(
                 agent.train()
 
         episode_rewards.append(episode_reward)
-
         average_reward = np.mean(
             episode_rewards[-25:]
         )
@@ -97,15 +96,28 @@ def train(
             f"Total Steps {total_steps:7d}"
         )
 #Periodic Evaluation
-        if (
-            (episode + 1) % evaluate_every == 0
-        ):
-            evaluate(
+        if (episode + 1) % evaluate_every == 0:
+            metrics = evaluate(
                 env=env,
                 agent=agent,
                 episodes=evaluation_episodes,
             )
 
+            eval_reward = metrics["reward"]
+
+            # Save only when evaluation reward improves
+            if eval_reward > best_eval_reward:
+                best_eval_reward = eval_reward
+
+                agent.save_actor(
+                    "checkpoints/actor_best.pt"
+                )
+
+                print(
+                    f"  New best actor saved | "
+                    f"Evaluation Reward: {best_eval_reward:.3f}"
+                )
+    agent.save_actor("checkpoints/actor_final.pt")
     return episode_rewards
 
 def visualize_run(env, agent, visualizer_settings):
@@ -199,3 +211,43 @@ def evaluate(
             np.mean(final_heading_errors)
         ),
     }
+def visualize_trained_actor(visualizer_settings,
+    checkpoint_path="checkpoints/actor_final.pt"
+):
+    env = RobotEnv()
+
+    agent = TD3(
+        state_dim=4,
+        privileged_state_dim=6,
+        action_dim=3,
+    )
+    agent.load_actor(checkpoint_path)
+
+    actor_state = env.reset()
+
+    visualizer = Visualizer(
+        robot=env.robot,
+        path=env.path_one,
+        settings= visualizer_settings,
+        time_step=env.time_step,
+    )
+
+    done = False
+    total_reward = 0.0
+
+    while not done:
+        action = agent.select_action(
+            actor_state,
+            explore=False,
+        )
+
+        actor_state, _, reward, done, info = env.step(action)
+
+        total_reward += reward
+        visualizer.draw()
+
+    visualizer.show()
+
+    print(f"Total reward: {total_reward:.3f}")
+    print(f"Final position error: {info['position_error']:.3f} in")
+    print(f"Final heading error: {info['heading_error']:.3f} rad")
